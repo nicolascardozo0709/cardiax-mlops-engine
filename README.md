@@ -8,145 +8,145 @@
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-gray.svg)](https://opensource.org/licenses/MIT)
 
-> **Microservicio clínico de MLOps y procesamiento digital de señales electrocardiográficas (ECG Lead II) para la clasificación en tiempo real de arritmias cardíacas bajo el estándar internacional ANSI/AAMI EC57.**  
-> Desarrollado por **Nicolás Cardozo** (*Estudiante de Ciencia de Datos, Pontificia Universidad Javeriana, Bogotá*).
+> **Clinical-grade MLOps microservice and digital signal processing engine for real-time cardiac arrhythmia classification from Lead II electrocardiograms under the ANSI/AAMI EC57 international standard.**  
+> Developed by **Nicolás Cardozo** (*Data Science Undergraduate, Pontificia Universidad Javeriana, Bogotá*).
 
 <div align="center">
   <br>
-  <img src="outputs/cardiax_telemetry_strip.png" alt="Tira de Telemetría Clínica CardiaX" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
-  <p><em>Trazo de osciloscopio en tiempo real con papel milimetrado estándar (0.04s x 0.1mV), etiquetado automatizado AAMI EC57 y tacograma RR instantáneo.</em></p>
+  <img src="outputs/cardiax_telemetry_strip.png" alt="CardiaX Clinical Telemetry Rhythm Strip" width="85%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <p><em>Real-time oscilloscope trace on standard millimeter grid (0.04s x 0.1mV), automated ANSI/AAMI EC57 beat annotation, and instantaneous RR tachogram.</em></p>
   <br>
 </div>
 
 ---
 
-## 1. Resumen Ejecutivo y Relevancia Clínica
+## 1. Executive Summary & Clinical Significance
 
-En la medicina deportiva de alta exigencia, la preparación atlética de resistencia y la cardiología clínica, las arritmias cardíacas representan un espectro que va desde adaptaciones fisiológicas benignas (como la bradicardia sinusal y las extrasístoles aisladas en corredores de fondo) hasta eventos con riesgo inminente de muerte súbita (taquicardia ventricular, fibrilación ventricular o bloqueos de conducción severos).
+In high-performance sports cardiology, endurance training, and clinical medicine, cardiac arrhythmias span from physiological adaptations (such as athletic sinus bradycardia and benign isolated ectopics in marathoners) to life-threatening events carrying imminent sudden cardiac arrest risk (ventricular tachycardia, ventricular fibrillation, or high-grade conduction blocks).
 
-El estándar de la **Association for the Advancement of Medical Instrumentation (ANSI/AAMI EC57)** prescribe agrupar los complejos electrocardiográficos en 5 clases funcionales universales:
+The **Association for the Advancement of Medical Instrumentation (ANSI/AAMI EC57)** standard defines 5 universal functional heartbeat categories:
 
-| Clase AAMI | Denominación Clínica | Complejos Representados | Nivel de Riesgo Clínico |
+| AAMI Class | Clinical Name | Represented Cardiac Complexes | Clinical Urgency Level |
 |:---:|:---|:---|:---|
-| **N** | **Normal Sinus Beat** | Ritmo sinusal normal, bloqueos de rama izquierda/derecha (LBBB, RBBB), escape nodal. | Benigno / Fisiológico |
-| **S** | **Supraventricular Ectopic Beat (SVEB)** | Contracción auricular prematura (PAC), latidos nodales o aberrantes prematuros. | Bajo / Monitoreo Holter |
-| **V** | **Ventricular Ectopic Beat (VEB)** | Extrasístole ventricular prematura (PVC), escape ventricular. | **Elevado / Factor de Riesgo Crítico** |
-| **F** | **Fusion Beat** | Fusión de activación simultánea sinusal y ventricular. | Moderado / Monitoreo |
-| **Q** | **Unknown / Paced Beat** | Espículas de marcapasos artificial o artefactos incalificables de movimiento. | Indeterminado / Técnico |
+| **N** | **Normal Sinus Beat** | Normal sinus rhythm, left/right bundle branch blocks (LBBB, RBBB), nodal escape. | Benign / Physiological |
+| **S** | **Supraventricular Ectopic Beat (SVEB)** | Premature atrial contraction (PAC), aberrant atrial or nodal premature beats. | Low / Holter Monitoring |
+| **V** | **Ventricular Ectopic Beat (VEB)** | Premature ventricular contraction (PVC), ventricular escape. | **Elevado / Critical ICU Factor** |
+| **F** | **Fusion Beat** | Co-activation fusion of ventricular and supraventricular wavefronts. | Moderate / Monitoring |
+| **Q** | **Unknown / Paced Beat** | Artificial pacemaker spikes or unclassifiable motion artifacts. | Indeterminate / Technical |
 
-**CardiaX** implementa un pipeline de producción completo: filtrado digital de fase cero, algoritmo Pan-Tompkins para detección de picos R, extracción de 19 biomarcadores morfológicos y espectrales, inferencia mediante ensamble de árboles potenciados por gradiente (XGBoost), microservicio REST en FastAPI y dashboard interactivo estilo osciloscopio de UCI.
+**CardiaX** delivers an end-to-end production architecture: zero-phase digital filtering, Pan-Tompkins QRS peak detection, extraction of 19 morphological and spectral bio-features, multi-class gradient boosted inference (XGBoost), a high-throughput FastAPI REST microservice, and an interactive dark-mode ICU oscilloscope web dashboard.
 
 ---
 
-## 2. Fundamentos Matemáticos y Procesamiento de Señales
+## 2. Mathematical Formulations & Signal Processing
 
-### 2.1 Filtrado Digital de Fase Cero (Butterworth SOS)
-Para eliminar el desplazamiento de la línea base por respiración ($\approx 0.15 - 0.3 \text{ Hz}$) y el ruido muscular de alta frecuencia (EMG $> 40 \text{ Hz}$), la señal atraviesa un filtro Butterworth pasa-banda de 3er orden ($0.5 - 40 \text{ Hz}$) implementado con Secciones de Segundo Orden (SOS):
+### 2.1 Zero-Phase Digital Filtering (Butterworth SOS)
+To suppress respiratory baseline wander ($\approx 0.15 - 0.3 \text{ Hz}$) and high-frequency electromyographic muscle tremor (EMG $> 40 \text{ Hz}$), the signal passes through a 3rd-order Butterworth bandpass filter ($0.5 - 40 \text{ Hz}$) implemented using numerically stable Second-Order Sections (SOS):
 
 $$H(s) = \prod_{k=1}^{N/2} \frac{b_{0k} + b_{1k}s^{-1} + b_{2k}s^{-2}}{1 + a_{1k}s^{-1} + a_{2k}s^{-2}}$$
 
-Se aplica filtrado bidireccional (*forward-backward*) mediante `scipy.signal.sosfiltfilt`, garantizando una distorsión de fase idéntica a cero:
+Bidirectional forward-backward filtering (`scipy.signal.sosfiltfilt`) guarantees zero phase distortion:
 
 $$\phi(\omega) = 0, \quad \forall \omega$$
 
-Adicionalmente, se integra un filtro Notch IIR sintonizado a $60 \text{ Hz}$ ($Q = 30$) para eliminar la interferencia de la red eléctrica.
+An additional IIR notch filter tuned to $60 \text{ Hz}$ ($Q = 30$) eliminates AC electrical grid hum.
 
 ---
 
-### 2.2 Algoritmo Clínico Pan-Tompkins para Detección QRS
-La detección de ondas R se basa en la canalización clásica de 5 etapas:
+### 2.2 Pan-Tompkins QRS Detection Algorithm
+R-peak localization is achieved via the classic 5-stage real-time pipeline:
 
-1. **Aislamiento de Banda QRS (5–15 Hz):** Filtro pasa-banda para atenuar ondas T altas y ruido P.
-2. **Filtro Derivador de 5 Puntos:** Captura la alta tasa de cambio ($dV/dt$) del flanco del complejo QRS:
+1. **QRS Isolation Bandpass (5–15 Hz):** Maximizes QRS spectral energy while suppressing tall P/T waves.
+2. **Five-Point Derivative Filter:** Captures steep slope dynamics ($dV/dt$):
    $$y[n] = \frac{1}{8} \left(2x[n] + x[n-1] - x[n-3] - 2x[n-4]\right)$$
-3. **No-linealidad Cuadrática:** Suprime polaridades negativas y amplifica no linealmente la energía del complejo:
+3. **Quadratic Squaring:** Rectifies bipolar deflections and non-linearly emphasizes high-frequency spikes:
    $$y[n] = x^2[n]$$
-4. **Integración en Ventana Móvil ($W = 150 \text{ ms}$):**
+4. **Moving-Window Integration ($W = 150 \text{ ms}$):**
    $$y[n] = \frac{1}{N} \sum_{k=0}^{N-1} x[n-k]$$
-5. **Umbralización Adaptativa con Período Refractario:** Umbral dual dinámico con ventana de bloqueo fisiológico de $200 \text{ ms}$ ($\text{HR}_{\max} \approx 240 \text{ BPM}$).
+5. **Adaptive Dual-Thresholding & Refractory Period:** Dynamic thresholding with a $200 \text{ ms}$ physiological blanking window ($\text{HR}_{\max} \approx 240 \text{ BPM}$).
 
 ---
 
-### 2.3 Espacio de Características Morfológicas y Dinámicas (19 Dimensiones)
-Cada latido se segmenta en una ventana de $800 \text{ ms}$ centrada en el pico R ($[-400\text{ ms}, +400\text{ ms}]$) y se extraen:
+### 2.3 Morphological & Spectral Feature Space (19 Dimensions)
+Each beat is segmented in an $800 \text{ ms}$ window centered on the R-peak ($[-400\text{ ms}, +400\text{ ms}]$):
 
-* **Cinemática QRS:** Amplitud pico a pico, duración temporal ($\text{QRS}_{\text{duration}}$ en ms donde la potencia supera el 15%), energía total $\int x^2 dt$ y área bajo la curva.
-* **Morfología de Repolarización:** Amplitud de onda P, amplitud de onda T, polaridad (+1 o -1 para inversión de onda T en PVCs) y desviación del segmento ST ($+60 \text{ ms}$ a $+120 \text{ ms}$).
-* **Momentos Estadísticos:** Varianza $\sigma^2$, asimetría de Fisher-Pearson (*skewness*) y curtosis (*kurtosis*).
-* **Distribución Espectral FFT:** Potencia relativa en banda baja ($0-5\text{ Hz}$), banda QRS ($5-15\text{ Hz}$) y banda alta ($15-40\text{ Hz}$), junto con la entropía espectral de Shannon:
+* **QRS Kinematics:** Peak-to-peak amplitude, duration in ms ($\text{QRS}_{\text{duration}}$ where power $> 15\%$), total energy $\int x^2 dt$, and total area.
+* **Repolarization Morphology:** P-wave amplitude, T-wave amplitude, T-wave polarity (+1 or -1 for discordant T-wave inversion in PVCs), and ST-segment deviation ($+60 \text{ ms}$ to $+120 \text{ ms}$).
+* **Statistical Moments:** Variance $\sigma^2$, Fisher-Pearson skewness, and kurtosis.
+* **FFT Spectral Distribution:** Relative power in low band ($0-5\text{ Hz}$), QRS band ($5-15\text{ Hz}$), and high band ($15-40\text{ Hz}$), along with Shannon spectral entropy:
   $$H_{\text{spectral}} = - \sum_{i} P_i \log_2 P_i$$
-* **Dinámica Temporal RR:** Intervalo Pre-RR, intervalo Post-RR y ratio de desbalance $\frac{\text{Pre-RR}}{\text{Post-RR}}$ (clave para registrar la pausa compensatoria de las extrasístoles ventriculares).
+* **Temporal RR Dynamics:** Pre-RR interval, Post-RR interval, and RR imbalance ratio $\frac{\text{Pre-RR}}{\text{Post-RR}}$ (capturing the full compensatory pause of ventricular ectopics).
 
 ---
 
-## 3. Arquitectura del Sistema y MLOps
+## 3. System Architecture & MLOps
 
 ```
 projects/04-mlops-production-api/
 ├── src/
 │   ├── data/
-│   │   ├── synthetic_generator.py   <- Modelo dinámico generativo de ECG Lead II (AAMI N, S, V, F, Q)
-│   │   └── ecg_loader.py            <- Ingesta, particionado y generador de tiras clínicas
+│   │   ├── synthetic_generator.py   <- Dynamical generative model of Lead II ECG (AAMI N, S, V, F, Q)
+│   │   └── ecg_loader.py            <- Ingestion, partitioning, and clinical strip generator
 │   ├── features/
-│   │   ├── signal_filter.py         <- Butterworth SOS, Notch IIR y Pan-Tompkins QRS
-│   │   └── wave_morphology.py       <- Extracción de 19 biomarcadores morfológicos/espectrales
+│   │   ├── signal_filter.py         <- Butterworth SOS, Notch IIR, and Pan-Tompkins QRS
+│   │   └── wave_morphology.py       <- 19-dimensional morphological and spectral extractor
 │   ├── models/
-│   │   ├── arrhythmia_classifier.py <- Clasificador XGBoost multi-clase + StandardScaler serializado
-│   │   └── evaluator.py             <- Auditoría ANSI/AAMI EC57 y benchmarking de latencia
+│   │   ├── arrhythmia_classifier.py <- Multi-class XGBoost classifier + serialized StandardScaler
+│   │   └── evaluator.py             <- ANSI/AAMI EC57 clinical audit & latency profiler
 │   └── visualization/
-│       └── oscilloscope_plots.py    <- Generador de trazados en papel milimetrado ECG
-├── tests/                           <- Suite de pruebas unitarias Pytest (10 tests, 100% passed)
+│       └── oscilloscope_plots.py    <- Clinical ECG millimeter grid strip plotter
+├── tests/                           <- Automated Pytest suite (10 tests, 100% passed)
 │   ├── test_signal_filter.py
 │   ├── test_feature_extraction.py
 │   ├── test_classifier.py
 │   └── test_api.py
-├── data/                            <- Dataset binario comprimido (.npz)
-├── outputs/                         <- Modelo (.joblib), matrices y reportes JSON
+├── data/                            <- Compressed binary dataset (.npz)
+├── outputs/                         <- Serialized model (.joblib), matrices, and JSON telemetry
 ├── templates/
-│   └── index.html                   <- Dashboard Osciloscopio dark-mode con Canvas 60 FPS
-├── app.py                           <- API REST de alto rendimiento en FastAPI
-├── main.py                          <- Pipeline reproducible CLI de entrenamiento
-├── Dockerfile                       <- Contenedor multi-stage optimizado para producción
-├── docker-compose.yml               <- Orquestador de despliegue
-└── requirements.txt                 <- Dependencias fijadas
+│   └── index.html                   <- Dark-mode 60 FPS HTML5 Canvas Oscilloscope Dashboard
+├── app.py                           <- Production REST API in FastAPI
+├── main.py                          <- CLI training and evaluation pipeline
+├── Dockerfile                       <- Multi-stage container optimized for production
+├── docker-compose.yml               <- Container orchestration
+└── requirements.txt                 <- Pinned production dependencies
 ```
 
 ---
 
-## 4. Resultados Cuantitativos y Evaluación AAMI EC57
+## 4. Quantitative Results & AAMI EC57 Evaluation
 
-Evaluación estratificada independiente ($n = 300$ latidos de prueba):
+Stratified independent test evaluation ($n = 300$ test heartbeats):
 
 <div align="center">
   <br>
-  <img src="outputs/cardiax_confusion_matrix.png" alt="Matriz de Confusión CardiaX" width="55%" style="border-radius: 8px; border: 1px solid #1E293B;" />
+  <img src="outputs/cardiax_confusion_matrix.png" alt="CardiaX Confusion Matrix" width="55%" style="border-radius: 8px; border: 1px solid #1E293B;" />
   <br>
 </div>
 
-| Métrica Clínica / de Ingeniería | Resultado Obtenido | Requisito / Benchmark Clínico |
+| Metric / Clinical Indicator | Achieved Result | Clinical Requirement / Benchmark |
 |:---|:---:|:---:|
-| **Exactitud Global (Accuracy)** | **100.00%** | $\ge 95.0\%$ |
-| **Exactitud Balanceada** | **100.00%** | $\ge 92.0\%$ |
+| **Overall Accuracy** | **100.00%** | $\ge 95.0\%$ |
+| **Balanced Accuracy** | **100.00%** | $\ge 92.0\%$ |
 | **Macro F1-Score** | **100.00%** | $\ge 90.0\%$ |
-| **Sensibilidad VEB (Recall clase V - Extrasístoles)** | **100.00%** | $\ge 95.0\%$ (Crítico en UCI) |
-| **Especificidad VEB** | **100.00%** | $\ge 98.0\%$ |
-| **Sensibilidad SVEB (Recall clase S - Auriculares)** | **100.00%** | $\ge 90.0\%$ |
-| **Latencia de Inferencia (P50)** | **1.26 ms / latido** | $< 10.0\text{ ms}$ (Sub-milisegundo) |
-| **Rendimiento de Procesamiento** | **~700 latidos / segundo** | Tiempo Real Holter |
+| **VEB Sensitivity (Recall for Class V - PVCs)** | **100.00%** | $\ge 95.0\%$ (Critical in ICU) |
+| **VEB Specificity** | **100.00%** | $\ge 98.0\%$ |
+| **SVEB Sensitivity (Recall for Class S - PACs)** | **100.00%** | $\ge 90.0\%$ |
+| **Inference Latency (P50)** | **1.26 ms / beat** | $< 10.0\text{ ms}$ (Sub-millisecond) |
+| **Throughput** | **~700 beats / second** | Real-Time Holter Streaming |
 
 ---
 
-## 5. Microservicio REST API (FastAPI)
+## 5. REST API Reference (FastAPI)
 
-### Endpoints Principales:
-* `GET /api/health`: Estado del servicio, versión del modelo e información del sistema.
-* `POST /api/predict/beat`: Clasificación de un latido aislado a partir de su ventana de amplitud.
-* `POST /api/predict/signal`: Análisis completo de una tira continua de ECG (filtrado digital, detección Pan-Tompkins de ondas R, cálculo de FC, métricas autonómicas de VFC: SDNN y RMSSD, carga arrítmica y clasificación AAMI).
-* `GET /api/benchmark/{pattern}`: Carga de casos clínicos de prueba (`normal`, `bigeminy`, `trigeminy`, `couplet`, `svt`).
-* `GET /api/artifacts/{filename}`: Descarga de artefactos generados (gráficos e informes).
-* `GET /`: Dashboard web interactivo estilo osciloscopio con trazado en tiempo real.
+### Key Endpoints:
+* `GET /api/health`: Service health status, model version, and runtime metadata.
+* `POST /api/predict/beat`: Real-time classification of an isolated single beat waveform.
+* `POST /api/predict/signal`: End-to-end continuous ECG strip processing (digital filtering, Pan-Tompkins R-peak detection, Heart Rate BPM, Heart Rate Variability metrics: SDNN & RMSSD, arrhythmia burden %, and AAMI EC57 classification).
+* `GET /api/benchmark/{pattern}`: Preloaded clinical benchmark cases (`normal`, `bigeminy`, `trigeminy`, `couplet`, `svt`).
+* `GET /api/artifacts/{filename}`: Download generated artifacts (confusion matrix and telemetry strips).
+* `GET /`: Real-time interactive dark-mode oscilloscope web monitor.
 
-#### Ejemplo de Petición HTTP (`curl`):
+#### HTTP Request Example (`curl`):
 ```bash
 curl -X POST "http://localhost:8000/api/predict/beat" \
      -H "Content-Type: application/json" \
@@ -155,34 +155,34 @@ curl -X POST "http://localhost:8000/api/predict/beat" \
 
 ---
 
-## 6. Guía de Ejecución y Despliegue
+## 6. Execution & Deployment Guide
 
-### Opción A: Ejecución Local
+### Option A: Local Execution
 ```bash
-# 1. Instalar dependencias
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Ejecutar entrenamiento y auditoría
+# 2. Run pipeline training and evaluation
 python main.py --samples 500
 
-# 3. Lanzar microservicio y dashboard
+# 3. Start microservice and dashboard
 python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
-Abre tu navegador en `http://127.0.0.1:8000`.
+Open your browser at `http://127.0.0.1:8000`.
 
-### Opción B: Ejecución con Docker
+### Option B: Docker Container
 ```bash
 docker build -t cardiax-engine .
 docker run -p 8000:8000 cardiax-engine
 ```
 
-### Opción C: Ejecutar Suite de Pruebas Unitarias
+### Option C: Run Automated Tests
 ```bash
 pytest tests/ -v
 ```
 
 ---
 
-## 7. Licencia y Créditos
-* **Autor:** Nicolás Cardozo | Estudiante de Ciencia de Datos, Pontificia Universidad Javeriana (Bogotá, Colombia).
-* **Licencia:** MIT License.
+## 7. License & Credits
+* **Author:** Nicolás Cardozo | Data Science Undergraduate, Pontificia Universidad Javeriana (Bogotá, Colombia).
+* **License:** MIT License.
