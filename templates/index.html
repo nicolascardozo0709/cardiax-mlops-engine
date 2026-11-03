@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CardiaX — Clinical ECG Arrhythmia MLOps Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070B12;
+      --card-bg: #0D1424;
+      --card-border: #1E293B;
+      --primary: #00FF9D;
+      --primary-dim: rgba(0, 255, 157, 0.15);
+      --accent-cyan: #00F0FF;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --purple: #8B5CF6;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --grid-minor: rgba(0, 255, 157, 0.06);
+      --grid-major: rgba(0, 255, 157, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(13, 20, 36, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #00FF9D, #00F0FF);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #070B12;
+      font-size: 1.1rem;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      background: var(--primary-dim);
+      border: 1px solid rgba(0, 255, 157, 0.3);
+      color: var(--primary);
+      border-radius: 9999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--primary);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 157, 0.7); }
+      70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(0, 255, 157, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 157, 0); }
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      padding: 1.5rem 2rem;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Telemetry HUD Grid */
+    .hud-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .hud-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hud-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      height: 100%;
+      background: var(--card-border);
+    }
+
+    .hud-card.accent-green::before { background: var(--primary); }
+    .hud-card.accent-cyan::before { background: var(--accent-cyan); }
+    .hud-card.accent-red::before { background: var(--danger); }
+    .hud-card.accent-amber::before { background: var(--warning); }
+
+    .hud-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .hud-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+    }
+
+    .hud-unit {
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+
+    .hud-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Oscilloscope Frame */
+    .oscilloscope-panel {
+      background: #05080E;
+      border: 1px solid #1E293B;
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+      position: relative;
+    }
+
+    .oscilloscope-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    select, button {
+      background: #0F172A;
+      color: var(--text-main);
+      border: 1px solid #334155;
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    select:hover, button:hover {
+      border-color: var(--primary);
+    }
+
+    button.btn-primary {
+      background: var(--primary);
+      color: #070B12;
+      border-color: var(--primary);
+      font-weight: 600;
+    }
+
+    button.btn-primary:hover {
+      background: #00E58D;
+    }
+
+    /* CRT Canvas Container */
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      height: 320px;
+      background: #040810;
+      border: 1px solid #13243A;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .ecg-overlay-tag {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: rgba(0, 255, 157, 0.8);
+      pointer-events: none;
+    }
+
+    /* AAMI Beat Legend */
+    .legend-bar {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      padding: 0.5rem 0;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border-top: 1px solid #132035;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend-pill {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Beats Table & Clinical Findings */
+    .details-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      .details-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .table-wrapper {
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    th {
+      background: #090E1A;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+
+    td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid #142035;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+
+    .pill-N { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .pill-S { background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .pill-V { background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .pill-F { background: rgba(139, 92, 246, 0.15); color: #8B5CF6; border: 1px solid rgba(139, 92, 246, 0.4); }
+    .pill-Q { background: rgba(107, 114, 128, 0.15); color: #9CA3AF; border: 1px solid rgba(107, 114, 128, 0.4); }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 1.25rem 2rem;
+      background: #05080E;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">CardiaX</div>
+        <div class="brand-subtitle">ANSI/AAMI EC57 Arrhythmia MLOps Engine</div>
+      </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+      <div class="badge-status">
+        <span class="pulse-dot"></span>
+        <span>MODEL ACTIVE (v1.0.0)</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Telemetry HUD -->
+    <div class="hud-grid">
+      <div class="hud-card accent-green">
+        <div class="hud-label">Heart Rate (Lead II)</div>
+        <div class="hud-value" id="val-bpm">-- <span class="hud-unit">BPM</span></div>
+        <div class="hud-sub" id="sub-bpm">Standard Lead II Rhythm</div>
+      </div>
+      <div class="hud-card accent-cyan">
+        <div class="hud-label">Mean RR Interval</div>
+        <div class="hud-value" id="val-rr">-- <span class="hud-unit">ms</span></div>
+        <div class="hud-sub">Pan-Tompkins Inter-Peak</div>
+      </div>
+      <div class="hud-card accent-amber">
+        <div class="hud-label">HRV Autonomic (RMSSD)</div>
+        <div class="hud-value" id="val-rmssd">-- <span class="hud-unit">ms</span></div>
+        <div class="hud-sub" id="val-sdnn">SDNN: -- ms</div>
+      </div>
+      <div class="hud-card accent-red">
+        <div class="hud-label">Arrhythmia Burden</div>
+        <div class="hud-value" id="val-burden">-- <span class="hud-unit">%</span></div>
+        <div class="hud-sub" id="val-alert">Scanning...</div>
+      </div>
+      <div class="hud-card">
+        <div class="hud-label">Inference Latency</div>
+        <div class="hud-value" id="val-lat">-- <span class="hud-unit">ms</span></div>
+        <div class="hud-sub">Throughput: ~700 beats/s</div>
+      </div>
+    </div>
+
+    <!-- Oscilloscope Frame -->
+    <div class="oscilloscope-panel">
+      <div class="oscilloscope-header">
+        <div class="panel-title">
+          <span>🩺 Real-Time Oscilloscope Monitor</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono';">25mm/s · 10mm/mV · 360Hz</span>
+        </div>
+        <div class="controls-row">
+          <label style="font-size: 0.8rem; color: var(--text-muted);">Clinical Case:</label>
+          <select id="case-select">
+            <option value="bigeminy">Ventricular Bigeminy (N-V-N-V)</option>
+            <option value="normal">Normal Sinus Rhythm (NSR)</option>
+            <option value="trigeminy">Ventricular Trigeminy (N-N-V)</option>
+            <option value="couplet">Ventricular Couplets (Paired PVCs)</option>
+            <option value="svt">Supraventricular PAC Burst</option>
+            <option value="mixed">Mixed Complex Arrhythmias</option>
+          </select>
+          <button class="btn-primary" onclick="loadSelectedCase()">Analyze Case</button>
+          <button id="btn-audio" onclick="toggleAudioPulse()">🔊 Audio: OFF</button>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="ecg-canvas"></canvas>
+        <div class="ecg-overlay-tag">LEAD II · FILTERED (0.5 - 40 Hz) · NOTCH 60Hz</div>
+      </div>
+
+      <div class="legend-bar">
+        <span style="font-weight: 600; color: var(--text-main);">AAMI Classes:</span>
+        <div class="legend-item"><span class="legend-pill" style="background:#10B981;"></span> <strong>N</strong> (Normal Sinus)</div>
+        <div class="legend-item"><span class="legend-pill" style="background:#F59E0B;"></span> <strong>S</strong> (Supraventricular PAC)</div>
+        <div class="legend-item"><span class="legend-pill" style="background:#EF4444;"></span> <strong>V</strong> (Ventricular VEB/PVC)</div>
+        <div class="legend-item"><span class="legend-pill" style="background:#8B5CF6;"></span> <strong>F</strong> (Fusion)</div>
+        <div class="legend-item"><span class="legend-pill" style="background:#6B7280;"></span> <strong>Q</strong> (Paced / Unknown)</div>
+      </div>
+    </div>
+
+    <!-- Details Grid -->
+    <div class="details-grid">
+      <!-- Beat Detection Log -->
+      <div class="card">
+        <div class="card-title">
+          <span>📋 Automated Heartbeat Classification Log</span>
+          <span id="beats-count-badge" class="badge-status" style="font-size: 0.7rem;">0 Beats</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Time (s)</th>
+                <th>AAMI Class</th>
+                <th>Clinical Interpretation</th>
+                <th>Confidence</th>
+                <th>Risk Level</th>
+              </tr>
+            </thead>
+            <tbody id="beats-tbody">
+              <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Cargando telemetría...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Class Distribution & Clinical Report -->
+      <div class="card">
+        <div class="card-title">📊 Cardiac Telemetry Summary</div>
+        <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.82rem;">
+          <div style="display:flex; justify-content:space-between; padding-bottom:0.5rem; border-bottom:1px solid #1E293B;">
+            <span style="color:var(--text-muted);">Standard:</span>
+            <strong>ANSI/AAMI EC57</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding-bottom:0.5rem; border-bottom:1px solid #1E293B;">
+            <span style="color:var(--text-muted);">VEB Sensitivity:</span>
+            <strong style="color:var(--primary);">100.0%</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding-bottom:0.5rem; border-bottom:1px solid #1E293B;">
+            <span style="color:var(--text-muted);">VEB Specificity:</span>
+            <strong style="color:var(--primary);">100.0%</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding-bottom:0.5rem; border-bottom:1px solid #1E293B;">
+            <span style="color:var(--text-muted);">Classifier Model:</span>
+            <strong>XGBoost Multi-Class</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding-bottom:0.5rem; border-bottom:1px solid #1E293B;">
+            <span style="color:var(--text-muted);">Artifacts:</span>
+            <div style="display:flex; gap:0.5rem;">
+              <a href="/api/artifacts/cardiax_confusion_matrix.png" target="_blank" style="color:var(--accent-cyan); text-decoration:none;">Confusion Matrix ↗</a>
+              <a href="/api/artifacts/cardiax_telemetry_strip.png" target="_blank" style="color:var(--primary); text-decoration:none;">Rhythm Strip ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div>
+      <strong>CardiaX MLOps Engine</strong> · Desarrollado por <strong>Nicolás Cardozo</strong> (Pontificia Universidad Javeriana)
+    </div>
+    <div>
+      <a href="https://github.com/nicolascardozo0709" target="_blank">GitHub</a> · 
+      <a href="https://www.linkedin.com/in/nicolas-cardozo-a779b331a" target="_blank">LinkedIn</a>
+    </div>
+  </footer>
+
+  <script>
+    let currentSignal = [];
+    let currentTime = [];
+    let currentBeats = [];
+    let audioContext = null;
+    let audioEnabled = false;
+
+    // Canvas Oscilloscope setup
+    const canvas = document.getElementById('ecg-canvas');
+    const ctx = canvas.getContext('2d');
+    let animationId = null;
+    let sweepX = 0;
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      drawGrid();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function drawGrid() {
+      ctx.fillStyle = '#050810';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const minorStep = 12;
+      const majorStep = minorStep * 5;
+
+      // Minor grid
+      ctx.strokeStyle = 'rgba(0, 255, 157, 0.05)';
+      ctx.lineWidth = 0.5;
+      for (let x = 0; x < canvas.width; x += minorStep) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += minorStep) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      // Major grid
+      ctx.strokeStyle = 'rgba(0, 255, 157, 0.12)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += majorStep) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += majorStep) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+    }
+
+    function renderStaticWaveform() {
+      if (!currentSignal.length) return;
+      drawGrid();
+
+      const centerY = canvas.height * 0.55;
+      const scaleY = canvas.height * 0.28;
+      const stepX = canvas.width / (currentSignal.length - 1);
+
+      // Glow effect
+      ctx.shadowColor = '#00FF9D';
+      ctx.shadowBlur = 6;
+      ctx.strokeStyle = '#00FF9D';
+      ctx.lineWidth = 1.8;
+
+      ctx.beginPath();
+      for (let i = 0; i < currentSignal.length; i++) {
+        const x = i * stepX;
+        const y = centerY - (currentSignal[i] * scaleY);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Draw Beat Annotations on Canvas
+      const totalDuration = currentTime[currentTime.length - 1] || 10.0;
+      currentBeats.forEach(b => {
+        const x = (b.peak_time_s / totalDuration) * canvas.width;
+        if (x >= 0 && x <= canvas.width) {
+          let color = '#10B981';
+          if (b.predicted_class === 'V') color = '#EF4444';
+          else if (b.predicted_class === 'S') color = '#F59E0B';
+          else if (b.predicted_class === 'F') color = '#8B5CF6';
+          else if (b.predicted_class === 'Q') color = '#6B7280';
+
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, centerY - 60, 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.font = 'bold 10px monospace';
+          ctx.fillText(b.predicted_class, x - 3, centerY - 70);
+        }
+      });
+    }
+
+    async function loadSelectedCase() {
+      const pattern = document.getElementById('case-select').value;
+      try {
+        const res = await fetch(`/api/benchmark/${pattern}`);
+        const data = await res.json();
+
+        // Update HUD
+        document.getElementById('val-bpm').innerHTML = `${data.mean_heart_rate_bpm} <span class="hud-unit">BPM</span>`;
+        const meanRR = data.rr_intervals_ms.length ? Math.round(data.rr_intervals_ms.reduce((a, b) => a + b) / data.rr_intervals_ms.length) : 0;
+        document.getElementById('val-rr').innerHTML = `${meanRR} <span class="hud-unit">ms</span>`;
+        document.getElementById('val-rmssd').innerHTML = `${data.rmssd_ms} <span class="hud-unit">ms</span>`;
+        document.getElementById('val-sdnn').innerText = `SDNN: ${data.sdnn_ms} ms`;
+        document.getElementById('val-burden').innerHTML = `${data.arrhythmia_burden_percent} <span class="hud-unit">%</span>`;
+        document.getElementById('val-alert').innerText = data.clinical_alert;
+        document.getElementById('val-lat').innerHTML = `${data.total_processing_time_ms} <span class="hud-unit">ms</span>`;
+
+        document.getElementById('beats-count-badge').innerText = `${data.total_beats_detected} Beats Analyzed`;
+
+        currentSignal = data.filtered_signal_subsample;
+        currentTime = data.time_subsample;
+        currentBeats = data.detected_beats;
+
+        // Render Table
+        const tbody = document.getElementById('beats-tbody');
+        tbody.innerHTML = '';
+        data.detected_beats.forEach((b, idx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>#${idx + 1}</strong></td>
+            <td>${b.peak_time_s.toFixed(2)}s</td>
+            <td><span class="pill pill-${b.predicted_class}">${b.predicted_class}</span></td>
+            <td>${b.class_name}</td>
+            <td><strong>${(b.confidence * 100).toFixed(1)}%</strong></td>
+            <td><span style="font-size:0.75rem; color:${b.predicted_class === 'V' ? '#EF4444' : '#10B981'}">${b.clinical_risk}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        renderStaticWaveform();
+
+      } catch (err) {
+        console.error('Error fetching clinical case:', err);
+      }
+    }
+
+    function toggleAudioPulse() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      audioEnabled = !audioEnabled;
+      const btn = document.getElementById('btn-audio');
+      btn.innerText = audioEnabled ? '🔊 Audio: ON' : '🔈 Audio: OFF';
+      btn.style.color = audioEnabled ? '#00FF9D' : '#F8FAFC';
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      resizeCanvas();
+      loadSelectedCase();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+{
+  "standards_compliance": "ANSI/AAMI EC57",
+  "model_version": "1.0.0",
+  "total_test_samples": 300,
+  "overall_accuracy": 1.0,
+  "balanced_accuracy": 1.0,
+  "macro_f1": 1.0,
+  "weighted_f1": 1.0,
+  "veb_sensitivity": 1.0,
+  "veb_specificity": 1.0,
+  "sveb_sensitivity": 1.0,
+  "class_metrics": {
+    "N": {
+      "class_index": 0,
+      "sensitivity_recall": 1.0,
+      "specificity": 1.0,
+      "positive_predictivity": 1.0,
+      "support": 60
+    },
+    "S": {
+      "class_index": 1,
+      "sensitivity_recall": 1.0,
+      "specificity": 1.0,
+      "positive_predictivity": 1.0,
+      "support": 60
+    },
+    "V": {
+      "class_index": 2,
+      "sensitivity_recall": 1.0,
+      "specificity": 1.0,
+      "positive_predictivity": 1.0,
+      "support": 60
+    },
+    "F": {
+      "class_index": 3,
+      "sensitivity_recall": 1.0,
+      "specificity": 1.0,
+      "positive_predictivity": 1.0,
+      "support": 60
+    },
+    "Q": {
+      "class_index": 4,
+      "sensitivity_recall": 1.0,
+      "specificity": 1.0,
+      "positive_predictivity": 1.0,
+      "support": 60
+    }
+  },
+  "latency": {
+    "mean_ms": 1.438,
+    "p50_ms": 1.259,
+    "p95_ms": 2.247,
+    "p99_ms": 2.654,
+    "throughput_beats_per_sec": 695.2
+  },
+  "confusion_matrix": [
+    [
+      60,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      60,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      60,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      60,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      60
+    ]
+  ]
+}

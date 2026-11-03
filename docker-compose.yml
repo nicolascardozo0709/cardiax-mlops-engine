@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  cardiax-api:
+    build: .
+    container_name: cardiax_engine
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
